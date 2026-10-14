@@ -32,6 +32,8 @@ for (const [, items] of FACILITY_GROUPS) {
 const facEmoji = (t) => FACILITY.get(t)?.emoji || "📍";
 const facLabel = (t) => FACILITY.get(t)?.label || t;
 
+const DISTANCES = [5, 10, 15, 20, 25]; // max route length options, km
+
 const MODES = {
   car: { label: "bil", icon: "🚗", api: "DRIVE", gmaps: "driving" },
   transit: { label: "offentlig transport", icon: "🚆", api: "TRANSIT", gmaps: "transit" },
@@ -44,6 +46,7 @@ const state = {
   routes: [],
   byId: new Map(),
   selected: new Set(load("selected", [])),
+  maxKm: load("maxKm", null), // null = any length
   mode: load("mode", "car"),
   maxMinutes: load("maxMinutes", 45),
   origin: null, // { lat, lng, label }
@@ -101,6 +104,15 @@ function destinationFor(route, mode) {
 function matchesFacilities(route, selected) {
   for (const t of selected) if (!route.facilities.includes(t)) return false;
   return true;
+}
+
+// Routes without a known length are left out once a max length is chosen.
+function matchesDistance(route, maxKm) {
+  return maxKm == null || (route.km != null && route.km <= maxKm);
+}
+
+function matchesFilters(route, selected = state.selected, maxKm = state.maxKm) {
+  return matchesDistance(route, maxKm) && matchesFacilities(route, selected);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,10 +174,21 @@ document.addEventListener("click", (e) => {
 // ---------------------------------------------------------------------------
 // 1. Facilities
 
+function renderDistances() {
+  const chips = DISTANCES.map((km) => {
+    const on = state.maxKm === km;
+    const n = state.routes.filter((r) => matchesFilters(r, state.selected, km)).length;
+    return `<button class="chip" aria-pressed="${on}" data-km="${km}" ${!on && !n ? "disabled" : ""}>
+      Maks. ${km} km<span class="n">${on ? "" : n}</span></button>`;
+  }).join("");
+  $("#distance-filter").innerHTML = `<div class="group"><div class="group-title">Rutelængde</div><div class="chips">${chips}</div></div>`;
+}
+
 function renderFacilities() {
-  const pool = state.routes;
+  renderDistances();
+  const pool = state.routes.filter((r) => matchesDistance(r, state.maxKm));
   const known = new Set(FACILITY.keys());
-  const extra = [...new Set(pool.flatMap((r) => r.facilities))].filter((t) => !known.has(t)).sort();
+  const extra = [...new Set(state.routes.flatMap((r) => r.facilities))].filter((t) => !known.has(t)).sort();
   const groups = extra.length ? [...FACILITY_GROUPS, ["Andet", extra.map((t) => [t, "📍"])]] : FACILITY_GROUPS;
 
   const html = groups.map(([title, items]) => {
@@ -174,7 +197,7 @@ function renderFacilities() {
         const on = state.selected.has(type);
         const trial = new Set(state.selected).add(type);
         const n = pool.filter((r) => matchesFacilities(r, trial)).length;
-        const total = pool.filter((r) => r.facilities.includes(type)).length;
+        const total = state.routes.filter((r) => r.facilities.includes(type)).length;
         if (!total) return "";
         return `<button class="chip" aria-pressed="${on}" data-type="${esc(type)}" ${!on && !n ? "disabled" : ""}>
           <span>${facEmoji(type)}</span>${esc(facLabel(type))}<span class="n">${on ? "" : n}</span></button>`;
@@ -187,8 +210,17 @@ function renderFacilities() {
   const count = pool.filter((r) => matchesFacilities(r, state.selected)).length;
   $("#to-travel").innerHTML = `Videre <span class="count">· ${count} ruter</span>`;
   $("#to-travel").disabled = count === 0;
-  $("#clear-facilities").hidden = state.selected.size === 0;
+  $("#clear-facilities").hidden = state.selected.size === 0 && state.maxKm == null;
 }
+
+$("#distance-filter").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip || chip.disabled) return;
+  const km = Number(chip.dataset.km);
+  state.maxKm = state.maxKm === km ? null : km;
+  save("maxKm", state.maxKm);
+  renderFacilities();
+});
 
 $("#facility-groups").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
@@ -200,7 +232,9 @@ $("#facility-groups").addEventListener("click", (e) => {
 });
 $("#clear-facilities").addEventListener("click", () => {
   state.selected.clear();
+  state.maxKm = null;
   save("selected", []);
+  save("maxKm", null);
   renderFacilities();
 });
 $("#to-travel").addEventListener("click", () => go("#/rejse"));
@@ -434,7 +468,7 @@ async function findRoutes() {
     // Nothing gets further than ~130 km/h in a straight line, so skip routes that can't make it.
     const maxKm = (state.maxMinutes / 60) * 130;
     const candidates = state.routes
-      .filter((r) => matchesFacilities(r, state.selected))
+      .filter((r) => matchesFilters(r))
       .map((r) => ({ route: r, dest: destinationFor(r, state.mode) }))
       .filter((c) => haversineKm(state.origin, c.dest) <= maxKm);
 
@@ -474,7 +508,8 @@ function renderResults() {
   const facText = state.selected.size
     ? ` med ${[...state.selected].map((t) => `${facEmoji(t)} ${esc(facLabel(t).toLowerCase())}`).join(", ")}`
     : "";
-  let summary = `<b>${n} ${n === 1 ? "rute" : "ruter"}</b> inden for ${fmtDuration(state.maxMinutes * 60)} i ${mode.label} fra ${esc(state.origin.label)}${facText}.`;
+  const kmText = state.maxKm != null ? ` på maks. ${state.maxKm} km` : "";
+  let summary = `<b>${n} ${n === 1 ? "rute" : "ruter"}</b>${kmText} inden for ${fmtDuration(state.maxMinutes * 60)} i ${mode.label} fra ${esc(state.origin.label)}${facText}.`;
   if (state.resultsMode === "transit" && state.unreachable) {
     summary += ` ${state.unreachable} ruter kan ikke nås med offentlig transport.`;
   }
@@ -492,9 +527,9 @@ function renderResults() {
     list.hidden = false;
     mapEl.hidden = true;
     list.innerHTML = `<div class="empty"><div class="big">🌲</div>
-      <p>Ingen ruter passer. Prøv en længere rejsetid eller færre faciliteter.</p>
+      <p>Ingen ruter passer. Prøv en længere rejsetid, en længere rute eller færre faciliteter.</p>
       <button class="btn outline small" onclick="go('#/rejse')">Ret rejsetid</button>
-      <button class="btn outline small" onclick="go('#/')">Ret faciliteter</button></div>`;
+      <button class="btn outline small" onclick="go('#/')">Ret længde og faciliteter</button></div>`;
     return;
   }
 
@@ -730,6 +765,7 @@ async function drawDetailMap(r) {
   // Drop stored selections for facility types that no longer exist.
   const types = new Set(state.routes.flatMap((r) => r.facilities));
   state.selected = new Set([...state.selected].filter((t) => types.has(t)));
+  if (!DISTANCES.includes(state.maxKm)) state.maxKm = null;
   window.addEventListener("hashchange", route);
   route();
 })();
