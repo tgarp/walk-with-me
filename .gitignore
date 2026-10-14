@@ -1,0 +1,12 @@
+# Python
+.venv/
+__pycache__/
+
+# Scraper cache and outputs (large; regenerate with scraper/scrape.py)
+/data/
+/output/
+/scraper/data/
+/scraper/output/
+
+# Logs
+*.log

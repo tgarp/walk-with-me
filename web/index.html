@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1d5a3c">
+  <title>Walk with me</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥾</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- 1. Facilities -->
+    <section class="screen" id="screen-facilities">
+      <header class="appbar">
+        <div class="brand"><span class="brand-mark">🥾</span> Walk with me</div>
+        <div class="steps"><span class="step on"></span><span class="step"></span><span class="step"></span></div>
+      </header>
+      <div class="content">
+        <h1>Hvad skal turen byde på?</h1>
+        <p class="lead">Vælg de faciliteter, ruten skal have. Vælger du ingenting, ser du alle ruter.</p>
+        <div id="facility-groups"></div>
+      </div>
+      <footer class="bottombar">
+        <button class="btn ghost" id="clear-facilities" hidden>Nulstil</button>
+        <button class="btn primary grow" id="to-travel">Videre</button>
+      </footer>
+    </section>
+
+    <!-- 2. Travel -->
+    <section class="screen" id="screen-travel">
+      <header class="appbar">
+        <button class="iconbtn" data-back aria-label="Tilbage">‹</button>
+        <div class="appbar-title">Rejsen</div>
+        <div class="steps"><span class="step done"></span><span class="step on"></span><span class="step"></span></div>
+      </header>
+      <div class="content">
+        <h1>Hvor langt vil du rejse?</h1>
+
+        <div class="field">
+          <label class="label" for="address">Hvor starter du?</label>
+          <button class="btn outline full" id="use-location"><span>📍</span> Brug min placering</button>
+          <div class="or">eller</div>
+          <div class="autocomplete">
+            <input id="address" class="input" type="text" placeholder="Skriv en adresse eller by" autocomplete="off" spellcheck="false">
+            <ul class="suggestions" id="suggestions" role="listbox" hidden></ul>
+          </div>
+          <div class="origin-chip" id="origin-chip" hidden></div>
+        </div>
+
+        <div class="field">
+          <div class="label">Hvordan kommer du derhen?</div>
+          <div class="segmented" role="radiogroup">
+            <button role="radio" data-mode="car" class="seg"><span>🚗</span> Bil</button>
+            <button role="radio" data-mode="transit" class="seg"><span>🚆</span> Offentlig transport</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label-row">
+            <label class="label" for="max-time">Maks. rejsetid</label>
+            <div class="big-value" id="max-time-value"></div>
+          </div>
+          <input type="range" id="max-time" min="10" max="180" step="5" value="45">
+          <div class="range-ends"><span>10 min</span><span>3 timer</span></div>
+        </div>
+
+        <p class="error" id="travel-error" hidden></p>
+      </div>
+      <footer class="bottombar">
+        <button class="btn primary grow" id="find-routes" disabled>Find ruter</button>
+      </footer>
+    </section>
+
+    <!-- 3. Results -->
+    <section class="screen" id="screen-results">
+      <header class="appbar">
+        <button class="iconbtn" data-back aria-label="Tilbage">‹</button>
+        <div class="appbar-title">Ruter</div>
+        <div class="steps"><span class="step done"></span><span class="step done"></span><span class="step on"></span></div>
+      </header>
+      <div class="results-head">
+        <div class="results-summary" id="results-summary"></div>
+        <div class="results-tools">
+          <div class="segmented small" role="tablist">
+            <button class="seg on" data-view="list">Liste</button>
+            <button class="seg" data-view="map">Kort</button>
+          </div>
+          <select id="sort" class="select" aria-label="Sortér">
+            <option value="time">Kortest rejsetid</option>
+            <option value="short">Korteste rute</option>
+            <option value="long">Længste rute</option>
+            <option value="name">Navn</option>
+          </select>
+        </div>
+      </div>
+      <div class="content flush" id="results-list"></div>
+      <div class="results-map" id="results-map" hidden></div>
+    </section>
+
+    <!-- 4. Route detail -->
+    <section class="screen" id="screen-detail">
+      <div class="content flush" id="detail"></div>
+      <footer class="bottombar">
+        <a class="btn primary grow" id="open-gmaps" target="_blank" rel="noopener">Åbn i Google Maps</a>
+      </footer>
+    </section>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
